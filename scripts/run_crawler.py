@@ -21,7 +21,7 @@ from config.settings import CONFIG
 from src.async_retry_handler import fetch_product_with_retry_async
 from src.cleaner import clean_product
 from src.product_validator import validate_product
-from src.json_handler import read_json, write_json
+from src.json_handler import write_json
 from src.error_classifier import classify_error
 from src.summary_report import build_summary
 from src.summary_printer import print_summary
@@ -56,7 +56,6 @@ TIMEOUT = CONFIG["runtime"]["timeout"]
 
 MAX_RETRIES = CONFIG["runtime"]["max_retries"]
 RETRY_SLEEP_SECONDS = CONFIG["runtime"]["retry_sleep_seconds"]
-
 # ============================================================
 # 4. LOAD PRODUCT IDS
 # ============================================================
@@ -69,14 +68,12 @@ def load_product_ids():
 
     if "id" not in df.columns:
         raise ValueError("products_clean.csv không có cột 'id'")
-
-    # Chuyển cột id thành list Product ID
+    #id -> python list
     original_ids = df["id"].astype(str).head(SAMPLE_SIZE).tolist()
 
-    # Đọc danh sách Product ID đã xử lý từ processed_ids.txt
+    #lưu lại giữ liệu đang chạy và đưa vào txt
     processed_ids = load_processed_ids(PROCESSED_IDS_FILE)
-
-    # Lọc ra các Product ID chưa xử lý để hỗ trợ resume khi chương trình bị dừng
+    #Chạy tiếp khi gặp các trường hợp như mất điện, mất mạng, bật lại thì chạy tiếp ngay id tiếp theo
     remaining_ids = filter_unprocessed_ids(original_ids, processed_ids)
 
     print(f"Total sample IDs     : {len(original_ids)}")
@@ -101,7 +98,7 @@ def process_api_result(result):
                 "status_code": result["status_code"],
                 "error": result["error"],
                 "error_type": error_type,
-                "attempts": result.get("attempts", 1),
+                "attempts": 1,
             },
             "warning": None,
         }
@@ -118,7 +115,7 @@ def process_api_result(result):
                 "error": "INVALID_PRODUCT",
                 "error_type": "INVALID_PRODUCT",
                 "warnings": validation_result["warnings"],
-                "attempts": result.get("attempts", 1),
+                "attempts": 1,
             },
             "warning": None,
         }
@@ -174,6 +171,7 @@ async def process_batch_async(batch_ids, batch_index):
         processed_result = process_api_result(result)
 
         if processed_result["failed"]:
+            processed_result["failed"]["attempts"] = result.get("attempts", 1)
             failed.append(processed_result["failed"])
             save_processed_id(PROCESSED_IDS_FILE, product_id)
             continue
@@ -198,39 +196,14 @@ async def process_batch_async(batch_ids, batch_index):
     )
 
     return products, failed, warnings
-
 # ============================================================
-# 7. BUILD SUMMARY FROM ALL OUTPUT FILES
-# ============================================================
-
-def read_all_json_files(folder, pattern):
-    items = []
-
-    for file_path in sorted(folder.glob(pattern)):
-        data = read_json(file_path)
-
-        if isinstance(data, list):
-            items.extend(data)
-
-    return items
-
-
-def build_summary_from_output():
-    products = read_all_json_files(PRODUCTS_DIR, "products_*.json")
-    failed = read_all_json_files(FAILED_DIR, "failed_*.json")
-    warnings = read_all_json_files(WARNINGS_DIR, "warnings_*.json")
-
-    return products, failed, warnings
-
-# ============================================================
-# 8. RUN ASYNC BATCH PIPELINE
+# 7. RUN ASYNC BATCH PIPELINE
 # ============================================================
 
 async def run_batches_async():
     original_ids, _ = load_product_ids()
 
     processed_ids = load_processed_ids(PROCESSED_IDS_FILE)
-
     batches = list(split_into_batches(original_ids, BATCH_SIZE))
 
     checkpoint = load_checkpoint(CHECKPOINT_FILE)
@@ -239,10 +212,13 @@ async def run_batches_async():
     print(f"Batch size        : {BATCH_SIZE}")
     print(f"Concurrency       : {CONCURRENCY}")
 
+    all_products = []
+    all_failed = []
+    all_warnings = []
+
     start_time = datetime.now()
 
     for batch_index, batch_ids in enumerate(batches, start=1):
-        # Lọc ID chưa xử lý ngay trong batch gốc để resume đúng vị trí
         batch_remaining_ids = filter_unprocessed_ids(batch_ids, processed_ids)
 
         if not batch_remaining_ids:
@@ -253,6 +229,10 @@ async def run_batches_async():
             batch_remaining_ids,
             batch_index
         )
+
+        all_products.extend(products)
+        all_failed.extend(failed)
+        all_warnings.extend(warnings)
 
         processed_ids = load_processed_ids(PROCESSED_IDS_FILE)
         processed_products = len(processed_ids)
@@ -267,11 +247,8 @@ async def run_batches_async():
 
     end_time = datetime.now()
 
-    # Đọc lại toàn bộ output để summary phản ánh tổng thể, không chỉ phần resume
-    all_products, all_failed, all_warnings = build_summary_from_output()
-
     if not all_products and not all_failed and not all_warnings:
-        print("No output data found. Existing output will not be overwritten.")
+        print("No remaining IDs to process. Existing output will not be overwritten.")
         return
 
     processed_count = len(load_processed_ids(PROCESSED_IDS_FILE))
@@ -298,7 +275,7 @@ async def run_batches_async():
     print(f"Summary saved to: {SUMMARY_FILE}")
 
 # ============================================================
-# 9. ENTRY POINT
+# 8. ENTRY POINT
 # ============================================================
 
 if __name__ == "__main__":
