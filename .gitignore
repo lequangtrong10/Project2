@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment
+.env
+config/.env
+# Logs
+logs/
+*.log
+
+# Output data
+#data/output/products/
+#data/output/failed/
+#data/output/warnings/
+#data/output/reports/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

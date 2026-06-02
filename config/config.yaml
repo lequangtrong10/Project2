@@ -1,0 +1,17 @@
+input:
+  clean_file: reports/products_clean.csv
+
+output:
+  base_dir: data/output
+  products_dir: data/output/products
+  failed_dir: data/output/failed
+  warnings_dir: data/output/warnings
+  reports_dir: data/output/reports
+
+runtime:
+  sample_size: 200000
+  batch_size: 1000
+  concurrency: 10
+  max_retries: 3
+  retry_sleep_seconds: 1
+  timeout: 10

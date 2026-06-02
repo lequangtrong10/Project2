@@ -1,0 +1,6 @@
+INPUT VALIDATION REPORT
+----------------------------------------
+Total Rows        : 200000
+Valid IDs         : 200000
+Duplicate IDs     : 0
+Invalid IDs       : 0
