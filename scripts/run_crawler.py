@@ -230,7 +230,6 @@ async def run_batches_async():
     original_ids, _ = load_product_ids()
 
     processed_ids = load_processed_ids(PROCESSED_IDS_FILE)
-
     batches = list(split_into_batches(original_ids, BATCH_SIZE))
 
     checkpoint = load_checkpoint(CHECKPOINT_FILE)
