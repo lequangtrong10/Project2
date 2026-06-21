@@ -16,14 +16,39 @@ HEADERS = {
     "Origin": "https://tiki.vn",
 }
 
+
 async def fetch_product_async(session, product_id, timeout=10):
     """
-    Gọi API Tiki bất đồng bộ cho 1 product_id.
+    Fetch product information asynchronously from the Tiki API.
+
+    Args:
+        session (aiohttp.ClientSession):
+            Active HTTP session used for sending requests.
+
+        product_id (str):
+            Tiki product identifier.
+
+        timeout (int, optional):
+            Request timeout in seconds. Defaults to 10.
+
+    Returns:
+        dict:
+            Dictionary containing request status, response data,
+            HTTP status code, and error information.
+
+    Raises:
+        No exception is propagated. All exceptions are converted
+        into structured error responses.
     """
     url = API_URL.format(id=product_id)
 
     try:
-        async with session.get(url, headers=HEADERS, timeout=timeout) as response:
+        async with session.get(
+            url,
+            headers=HEADERS,
+            timeout=timeout,
+        ) as response:
+
             status_code = response.status
 
             if status_code != 200:
@@ -54,28 +79,48 @@ async def fetch_product_async(session, product_id, timeout=10):
             "error": "TIMEOUT_ERROR",
         }
 
-    except aiohttp.ClientError as e:
+    except aiohttp.ClientError as error:
         return {
             "id": product_id,
             "success": False,
             "status_code": None,
             "data": None,
-            "error": f"REQUEST_ERROR: {e}",
+            "error": f"REQUEST_ERROR: {error}",
         }
 
-    except Exception as e:
+    except Exception as error:
         return {
             "id": product_id,
             "success": False,
             "status_code": None,
             "data": None,
-            "error": f"UNKNOWN_ERROR: {e}",
+            "error": f"UNKNOWN_ERROR: {error}",
         }
 
 
-async def fetch_many_products_async(product_ids, concurrency=50, timeout=10):
+async def fetch_many_products_async(
+    product_ids,
+    concurrency=50,
+    timeout=10,
+):
     """
-    Gọi API nhiều product_id cùng lúc, có giới hạn concurrency.
+    Fetch multiple products concurrently using asyncio.
+
+    Args:
+        product_ids (list[str]):
+            List of Tiki product IDs.
+
+        concurrency (int, optional):
+            Maximum number of simultaneous requests.
+            Defaults to 50.
+
+        timeout (int, optional):
+            Request timeout in seconds.
+            Defaults to 10.
+
+    Returns:
+        list[dict]:
+            List of API responses for all requested products.
     """
     semaphore = asyncio.Semaphore(concurrency)
 
