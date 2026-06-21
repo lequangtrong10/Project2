@@ -11,14 +11,11 @@ config/.env
 logs/
 *.log
 
-# Output data
-#data/output/products/
-#data/output/failed/
-#data/output/warnings/
-#data/output/reports/
+# Output data (regenerate được bằng cách chạy lại crawler — không cần track)
+data/output/
 
 # IDE / OS
 .vscode/
 .idea/
-.DS_Storedatabase.ini
+.DS_Store
 database.ini
