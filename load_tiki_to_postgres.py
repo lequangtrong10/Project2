@@ -3,12 +3,33 @@ from json import JSONDecodeError
 from pathlib import Path
 
 import psycopg2
-from psycopg2.extras import Json
+from psycopg2.extras import Json, execute_values
 
 from db_config import load_config
 
 
 PRODUCT_DIR = Path("data/output/products")
+
+INSERT_SQL = """
+    INSERT INTO tiki_products (
+        product_id,
+        name,
+        url_key,
+        price,
+        description,
+        images,
+        source_file
+    )
+    VALUES %s
+    ON CONFLICT (product_id)
+    DO UPDATE SET
+        name = EXCLUDED.name,
+        url_key = EXCLUDED.url_key,
+        price = EXCLUDED.price,
+        description = EXCLUDED.description,
+        images = EXCLUDED.images,
+        source_file = EXCLUDED.source_file;
+"""
 
 
 def read_json_file(file_path):
@@ -29,33 +50,19 @@ def read_json_file(file_path):
         return None
 
 
-def insert_product(cur, product, source_file):
-    sql = """
-        INSERT INTO tiki_products (
-            product_id,
-            name,
-            url_key,
-            price,
-            description,
-            images,
-            source_file
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (product_id)
-        DO UPDATE SET
-            name = EXCLUDED.name,
-            url_key = EXCLUDED.url_key,
-            price = EXCLUDED.price,
-            description = EXCLUDED.description,
-            images = EXCLUDED.images,
-            source_file = EXCLUDED.source_file;
-    """
+def build_insert_rows(products, source_file):
+    rows = []
+    skipped = 0
 
-    try:
-        product_id = product["id"]
+    for product in products:
+        product_id = product.get("id")
 
-        cur.execute(
-            sql,
+        if product_id is None:
+            print(f"[DATA ERROR] Missing required field 'id' in {source_file}")
+            skipped += 1
+            continue
+
+        rows.append(
             (
                 product_id,
                 product.get("name"),
@@ -64,21 +71,10 @@ def insert_product(cur, product, source_file):
                 product.get("description"),
                 Json(product.get("images", [])),
                 source_file,
-            ),
+            )
         )
 
-        return True
-
-    except KeyError as error:
-        print(f"[DATA ERROR] Missing required field {error} in {source_file}")
-        return False
-
-    except psycopg2.Error as error:
-        print(
-            f"[DB INSERT ERROR] source_file={source_file}, "
-            f"product_id={product.get('id')}, error={error}"
-        )
-        return False
+    return rows, skipped
 
 
 def load_products_to_postgres():
@@ -117,17 +113,27 @@ def load_products_to_postgres():
                         failed_files += 1
                         continue
 
-                    for product in products:
-                        success = insert_product(cur, product, file_path.name)
+                    rows, skipped = build_insert_rows(products, file_path.name)
+                    failed_products += skipped
 
-                        if success:
-                            total_products += 1
-                        else:
-                            failed_products += 1
-                            conn.rollback()
+                    if not rows:
+                        print(f"Loaded {file_path.name}: 0/{len(products)} rows (all skipped)")
+                        continue
 
-                    conn.commit()
-                    print(f"Loaded {file_path.name}")
+                    try:
+                        execute_values(cur, INSERT_SQL, rows, page_size=1000)
+                        conn.commit()
+                        total_products += len(rows)
+                        print(f"Loaded {file_path.name}: {len(rows)} rows")
+
+                    except psycopg2.Error as error:
+                        conn.rollback()
+                        failed_products += len(rows)
+                        failed_files += 1
+                        print(
+                            f"[DB INSERT ERROR] source_file={file_path.name}, "
+                            f"rows_attempted={len(rows)}, error={error}"
+                        )
 
     except psycopg2.OperationalError as error:
         print(f"[DB CONNECTION ERROR] Cannot connect to PostgreSQL: {error}")
@@ -149,4 +155,4 @@ def load_products_to_postgres():
 
 
 if __name__ == "__main__":
-    load_products_to_postgres()  
+    load_products_to_postgres()

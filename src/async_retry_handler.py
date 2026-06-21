@@ -1,4 +1,5 @@
 import asyncio
+import random
 
 from src.async_api_client import fetch_product_async
 from src.error_classifier import classify_error
@@ -33,7 +34,14 @@ async def fetch_product_with_retry_async(
             return result
 
         if should_retry(error_type, attempt, max_retries):
-            await asyncio.sleep(retry_sleep_seconds)
+
+            if error_type == "RATE_LIMIT":
+                base = retry_sleep_seconds * (2 ** (attempt - 1))
+                sleep_time = base + random.uniform(0, base * 0.5)
+            else:
+                sleep_time = retry_sleep_seconds
+
+            await asyncio.sleep(sleep_time)
             continue
 
         result["attempts"] = attempt
@@ -42,4 +50,5 @@ async def fetch_product_with_retry_async(
 
     last_result["attempts"] = max_retries
     last_result["error_type"] = last_error_type
+
     return last_result
