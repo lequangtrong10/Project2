@@ -1,24 +1,38 @@
 from pathlib import Path
 import shutil
-
+import sys
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = BASE_DIR / "data" / "output"
+sys.path.append(str(BASE_DIR))
+
+from config.settings import CONFIG
+REPORTS_DIR = BASE_DIR / CONFIG["output"]["reports_dir"]
+PRODUCTS_DIR = BASE_DIR / CONFIG["output"]["products_dir"]
+FAILED_DIR = BASE_DIR / CONFIG["output"]["failed_dir"]
+WARNINGS_DIR = BASE_DIR / CONFIG["output"]["warnings_dir"]
 
 FILES_TO_DELETE = [
-    OUTPUT_DIR / "reports" / "checkpoint_sample.json",
-    OUTPUT_DIR / "reports" / "processed_ids_sample.txt",
-    OUTPUT_DIR / "reports" / "summary_batches_sample.json",
+    # Active crawler output files
+    REPORTS_DIR / "checkpoint.json",
+    REPORTS_DIR / "processed_ids.txt",
+    REPORTS_DIR / "summary.json",
+    REPORTS_DIR / "recovered_products.json",
+    REPORTS_DIR / "final_failed.json",
+    REPORTS_DIR / "retry_summary.json",
 
-    OUTPUT_DIR / "reports" / "checkpoint_async.json",
-    OUTPUT_DIR / "reports" / "processed_ids_async.txt",
-    OUTPUT_DIR / "reports" / "summary_async.json",
+    # Legacy/Outdated filenames (for backward compatibility)
+    REPORTS_DIR / "checkpoint_sample.json",
+    REPORTS_DIR / "processed_ids_sample.txt",
+    REPORTS_DIR / "summary_batches_sample.json",
+    REPORTS_DIR / "checkpoint_async.json",
+    REPORTS_DIR / "processed_ids_async.txt",
+    REPORTS_DIR / "summary_async.json",
 ]
 
 DIRS_TO_CLEAN = [
-    OUTPUT_DIR / "products",
-    OUTPUT_DIR / "failed",
-    OUTPUT_DIR / "warnings",
+    PRODUCTS_DIR,
+    FAILED_DIR,
+    WARNINGS_DIR,
 ]
 
 

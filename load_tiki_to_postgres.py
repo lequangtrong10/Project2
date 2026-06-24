@@ -5,10 +5,11 @@ from pathlib import Path
 import psycopg2
 from psycopg2.extras import Json, execute_values
 
+from config.settings import CONFIG
 from db_config import load_config
 
-
-PRODUCT_DIR = Path("data/output/products")
+BASE_DIR = Path(__file__).resolve().parent
+PRODUCT_DIR = BASE_DIR / CONFIG["output"]["products_dir"]
 
 INSERT_SQL = """
     INSERT INTO tiki_products (

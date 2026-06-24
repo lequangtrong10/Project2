@@ -2,3 +2,5 @@ aiohttp
 pandas
 beautifulsoup4
 PyYAML
+pydantic
+psycopg2-binary
